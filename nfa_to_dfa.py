@@ -54,31 +54,59 @@ def move(nfa_states, symbol):
 def nfa_to_dfa(nfa):
     dfa = DFA()
 
+    # Cálculo del cierre epsilon para el estado inicial del NFA
     initial_closure = epsilon_closure([nfa.start_state])
     start_state = DFAState('q0', initial_closure)
     dfa.add_state(start_state)
     dfa.set_start_state(start_state)
 
-    unmarked_state = dfa.get_unmarked_state()
+    print(f"Estado inicial DFA: {start_state.name}, contiene NFA states: {[state.name for state in initial_closure]}")
+
+    unmarked_states = [start_state]
     state_count = 1
 
-    while unmarked_state is not None:
-        unmarked_state.marked = True
-        for symbol in set(symbol for state in unmarked_state.nfa_states for symbol in state.transitions if symbol is not None):
-            next_nfa_states = epsilon_closure(move(unmarked_state.nfa_states, symbol))
-            existing_state = dfa.get_state(next_nfa_states)
+    # Iterar sobre los estados no marcados
+    while unmarked_states:
+        current_dfa_state = unmarked_states.pop(0)
+        current_dfa_state.marked = True
+        print(f"Procesando estado DFA: {current_dfa_state.name}")
 
-            if existing_state is None:
-                new_state = DFAState(f'q{state_count}', next_nfa_states)
-                dfa.add_state(new_state)
-                unmarked_state.add_transition(symbol, new_state)
-                state_count += 1
-            else:
-                unmarked_state.add_transition(symbol, existing_state)
+        # Recolectar todos los símbolos posibles de las transiciones de los estados NFA en el estado DFA actual
+        symbols = set()
+        for state in current_dfa_state.nfa_states:
+            for symbol in state.transitions:
+                if symbol is not None:  # Ignorar transiciones epsilon
+                    symbols.add(symbol)
 
-        unmarked_state = dfa.get_unmarked_state()
+        # Procesar cada símbolo y crear nuevos estados del DFA si es necesario
+        for symbol in symbols:
+            next_nfa_states = epsilon_closure(move(current_dfa_state.nfa_states, symbol))
+            print(f"Transición con símbolo '{symbol}' lleva a NFA states: {[state.name for state in next_nfa_states]}")
+
+            if next_nfa_states:
+                existing_state = dfa.get_state(next_nfa_states)
+
+                if existing_state is None:
+                    new_state = DFAState(f'q{state_count}', next_nfa_states)
+                    dfa.add_state(new_state)
+                    unmarked_states.append(new_state)  # Añadir a la lista de estados no marcados
+                    current_dfa_state.add_transition(symbol, new_state)
+                    print(f"Nuevo estado DFA creado: {new_state.name}, contiene NFA states: {[state.name for state in next_nfa_states]}")
+                    state_count += 1
+                else:
+                    current_dfa_state.add_transition(symbol, existing_state)
+                    print(f"Estado DFA existente encontrado: {existing_state.name}, reutilizado.")
+
+    print("\nResumen de estados del DFA:")
+    for state in dfa.states:
+        print(f"Estado DFA: {state.name}, es final: {state.is_final}")
+        for symbol, next_state in state.transitions.items():
+            print(f"  {state.name} --{symbol}--> {next_state.name}")
 
     return dfa
+
+
+
 
 # Ejemplo de uso
 #if __name__ == "__main__":

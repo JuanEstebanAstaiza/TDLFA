@@ -91,35 +91,91 @@ def kleene_star(nfa):
     kleene_nfa.set_final_state(end)
     return kleene_nfa
 
-
-def regex_to_nfa(regex):
+def infix_to_postfix(infix):
+    precedence = {'*': 3, '.': 2, '|': 1}
+    output = []
     stack = []
-    for char in regex:
+    previous_char = None
+
+    for char in infix:
         if char.isalnum():
-            stack.append(create_basic_nfa(char))
+            if previous_char and (previous_char.isalnum() or previous_char == '*' or previous_char == ')'):
+                # Insertar concatenación implícita
+                while stack and stack[-1] not in '()|' and precedence['.'] <= precedence[stack[-1]]:
+                    output.append(stack.pop())
+                stack.append('.')
+            output.append(char)
+        elif char == '(':
+            if previous_char and (previous_char.isalnum() or previous_char == '*' or previous_char == ')'):
+                # Insertar concatenación implícita antes de '('
+                while stack and precedence['.'] <= precedence[stack[-1]]:
+                    output.append(stack.pop())
+                stack.append('.')
+            stack.append(char)
+        elif char == ')':
+            while stack and stack[-1] != '(':
+                output.append(stack.pop())
+            stack.pop()  # Sacar el '('
+        else:  # | o *
+            while stack and stack[-1] != '(' and precedence[char] <= precedence[stack[-1]]:
+                output.append(stack.pop())
+            stack.append(char)
+        previous_char = char
+
+    while stack:
+        output.append(stack.pop())
+
+    return ''.join(output)
+
+
+def regex_to_nfa(postfix):
+    stack = []
+    for char in postfix:
+        print(f"Procesando carácter: {char}")  # Depuración
+        if char.isalnum():
+            nfa = create_basic_nfa(char)
+            stack.append(nfa)
+            print(f"NFA creado para símbolo: {char}")
         elif char == '*':
-            nfa = stack.pop()
-            stack.append(kleene_star(nfa))
+            if stack:
+                nfa = stack.pop()
+                stack.append(kleene_star(nfa))
+                print("Aplicada estrella de Kleene.")
         elif char == '.':
-            nfa2 = stack.pop()
-            nfa1 = stack.pop()
-            stack.append(concatenate(nfa1, nfa2))
+            if len(stack) >= 2:
+                nfa2 = stack.pop()
+                nfa1 = stack.pop()
+                concatenated_nfa = concatenate(nfa1, nfa2)
+                stack.append(concatenated_nfa)
+                print("NFA concatenado.")
         elif char == '|':
-            nfa2 = stack.pop()
-            nfa1 = stack.pop()
-            stack.append(union(nfa1, nfa2))
+            if len(stack) >= 2:
+                nfa2 = stack.pop()
+                nfa1 = stack.pop()
+                union_nfa = union(nfa1, nfa2)
+                stack.append(union_nfa)
+                print("NFA unido (OR).")
 
-    return stack.pop() if stack else None
+    # Depuración: Verificar los estados y transiciones del NFA resultante
+    if stack:
+        nfa = stack[-1]
+        print("\nResumen de estados del NFA:")
+        for state in nfa.states:
+            for symbol, transitions in state.transitions.items():
+                for next_state in transitions:
+                    print(f"{state.name} --{symbol}--> {next_state.name}")
+        return nfa
+    else:
+        print("Error: la pila está vacía, no se pudo construir el NFA.")
+        return None
 
 
 
 
-#if __name__ == "__main__":
-  #  regex = "a.b|c*"
- #   nfa = regex_to_nfa(regex)
-   # print(f"Start State: {nfa.start_state.name}")
-    #print(f"Final State: {nfa.final_state.name}")
-    #for state in nfa.states:
-        #for symbol, transitions in state.transitions.items():
-          #  for transition_state in transitions:
-                #print(f"{state.name} --{symbol}--> {transition_state.name}")
+
+
+
+
+
+
+
